@@ -25,7 +25,7 @@ ui <- page_sidebar(
     .bslib-sidebar-layout > .sidebar { font-size: 0.78rem; }
     .bslib-sidebar-layout > .sidebar h5 {
       font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; margin-top: 2px;
-      text-transform: uppercase; letter-spacing: 0.03em; color: #2c3e50;
+      text-transform: uppercase; letter-spacing: 0.03em; color: #2f3f76;
     }
     .bslib-sidebar-layout > .sidebar .form-group,
     .bslib-sidebar-layout > .sidebar .form-check { margin-bottom: 4px !important; }
@@ -41,7 +41,7 @@ ui <- page_sidebar(
     /* ── Legend dl styling ── */
     .legend-box dt {
       font-weight: 600;
-      color: #2c3e50;
+      color: #2f3f76;
       margin-top: 0.55rem;
     }
     .legend-box dd {
@@ -156,8 +156,8 @@ server <- function(input, output, session) {
     
     ggplot(data.frame(score = scores), aes(x = score)) +
       geom_histogram(aes(y = after_stat(density)),
-                     bins = 30, fill = "#2c8c6e", colour = "white", alpha = 0.85) +
-      geom_density(colour = "#1a5c47", linewidth = 0.9) +
+                     bins = 30, fill = "#2f3f76", colour = "white", alpha = 0.85) +
+      geom_density(colour = "#2f3f76", linewidth = 0.9) +
       geom_vline(xintercept = input$obs,
                  linetype = "dashed", colour = "#e74c3c", linewidth = 1.2) +
       annotate("text", x = input$obs, y = Inf,
