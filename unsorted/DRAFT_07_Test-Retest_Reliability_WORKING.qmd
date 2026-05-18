@@ -1,0 +1,122 @@
+---
+title: "Test-Retest Reliability"
+subtitle: "Simulating consistency, practice effects, and what correlation does (and doesn't) tell you"
+date: today
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+#    toc-title: "Contents"
+    toc-location: left
+    code-fold: true
+    code-summary: "Show code"
+#    embed-resources: true
+    highlight-style: github
+execute:
+  warning: false
+  message: false
+  echo: false
+---
+
+## What is Test-Retest Reliability?
+
+**Test-retest reliability** refers to the consistency of a measure when the same individuals are tested more than once under identical (or near-identical) conditions. It answers a deceptively simple question:
+
+> *If I measure the same thing twice, do I get the same answer?*
+
+A high test-retest correlation tells you the instrument is **consistent** — not that the construct itself is stable, or that the scores are accurate. This distinction matters more than it might seem, and we'll return to it at the end.
+
+---
+
+## Interactive Sandbox
+
+The app below lets you change simulation parameters and see the results update in real time. It runs on a dedicated Shiny server — use the controls inside it to explore.
+
+<style>
+  iframe {
+    display: block;
+    box-sizing: border-box;
+  }
+</style>
+
+
+<iframe src="https://app.hsancamillo.it/app/corr?sp_hide_navbar=true" style="border:none;" height="500" width="100%" title="Iframe Example"></iframe>
+
+
+
+::: {.callout-tip title="Things to try in the app"}
+- Increase **sample size** and watch the observed *r* stabilise toward the true ρ  
+- Add a **practice effect** — the mean difference grows but *r* stays the same  
+- Set **ρ = 0** and check that the t-test is non-significant  
+:::
+
+---
+
+## Key Concepts
+
+### Why does correlation ignore practice effects?
+
+Pearson's $r$ measures the **linear relationship between deviations from the mean**.
+When you add a constant $\Delta$ to every retest score:
+
+$$r_{X,\, Y+\Delta} = \frac{\text{Cov}(X,\, Y+\Delta)}{\text{SD}(X)\cdot\text{SD}(Y+\Delta)} = \frac{\text{Cov}(X,Y)}{\text{SD}(X)\cdot\text{SD}(Y)} = r_{X,Y}$$
+
+The constant cancels out entirely. The **paired t-test**, by contrast, works on
+the raw differences $d_i = X_i - Y_i$, so it detects the shift immediately.
+
+### Static R example
+
+The chunk below replicates a single scenario in plain R — useful as a reference
+for the formulas the Shiny app uses under the hood.
+
+```{r}
+#| label: static-example
+
+library(faux)
+
+set.seed(42)
+res        <- rnorm_multi(50, mu = c(20, 20), sd = c(5, 5), r = 0.6)
+names(res) <- c("test", "retest")
+
+# correlation
+cor.test(res$test, res$retest)
+
+# paired t-test (no practice effect)
+t.test(res$test, res$retest, paired = TRUE)
+
+# paired t-test (practice effect +2)
+t.test(res$test, res$retest + 2, paired = TRUE)
+```
+
+---
+
+## Key Takeaway
+
+::: {.callout-warning title="Don't confuse reliability with stability"}
+A **high test-retest correlation** tells you that individuals who score high on
+the first occasion tend to score high on the second — it reflects
+**consistency of rank ordering**.
+
+It does *not* tell you:
+
+- That the absolute scores are accurate  
+- That the construct hasn't changed over time  
+- That systematic biases (like a practice effect) are absent  
+
+For a fuller picture, pair the correlation with a check on mean-level
+differences — which is exactly what **Bland-Altman plots** and **ICC** are
+designed for.
+:::
+
+---
+
+## Session Info
+
+```{r}
+#| label: session-info
+#| code-fold: true
+#| code-summary: "Show session info"
+
+sessionInfo()
+```
