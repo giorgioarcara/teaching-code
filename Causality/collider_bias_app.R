@@ -45,13 +45,14 @@ ui <- fluidPage(
     .app-header { background:#2c2c2a; color:#f5f4f0; padding:18px 32px 14px; }
     .app-header h1 { font-size:20px; font-weight:500; margin:0 0 4px; letter-spacing:-0.3px; }
     .app-header p  { font-size:13px; margin:0; color:#b4b2a9; }
-    .main-layout   { display:flex; gap:0; min-height:calc(100vh - 70px); }
+    .main-layout   { display:flex; gap:0; align-items:flex-start; }
     .sidebar {
       width:300px; min-width:300px; background:#ffffff;
       border-right:1px solid #d3d1c7; padding:24px 20px;
-      box-sizing:border-box; overflow-y:auto;
+      box-sizing:border-box; position:sticky; top:0;
+      max-height:100vh; overflow-y:auto;
     }
-    .main-panel { flex:1; padding:24px 28px; box-sizing:border-box; }
+    .main-panel { flex:1; padding:24px 28px; box-sizing:border-box; overflow-y:auto; }
     .section-label {
       font-size:11px; font-weight:500; letter-spacing:0.08em;
       text-transform:uppercase; color:#888780; margin:0 0 12px;
@@ -169,7 +170,7 @@ ui <- fluidPage(
 
       div(class = "dag-area",
         div(class = "dag-title", "Sample DAG \u2014 arrow width \u221d |r|"),
-        plotOutput("dag_plot", height = "200px")
+        plotOutput("dag_plot", height = "260px")
       )
     )
   )
@@ -300,11 +301,11 @@ server <- function(input, output, session) {
 
     # Correlation labels
     text((nx+yx)/2, ny+0.12,
-         sprintf("r = %+.2f", r_xy), cex=0.74, col="#2c2c2a", font=2)
+         sprintf("r = %+.2f", r_xy), cex=1.05, col="#2c2c2a", font=2)
     text((nx+cx)/2 - 0.09, (ny+cy)/2 + 0.03,
-         sprintf("r = %+.2f", r_xc), cex=0.68, col="#666360")
+         sprintf("r = %+.2f", r_xc), cex=0.95, col="#666360")
     text((yx+cx)/2 + 0.09, (yy+cy)/2 + 0.03,
-         sprintf("r = %+.2f", r_yc), cex=0.68, col="#666360")
+         sprintf("r = %+.2f", r_yc), cex=0.95, col="#666360")
 
     # C conditioning ring
     if (show) {
@@ -317,14 +318,14 @@ server <- function(input, output, session) {
     c_bord   <- if (show) "#d4537e" else "#888780"
     c_txt    <- if (show) "#993556" else "#5f5e5a"
 
-    draw_node(cx, cy, "C (collider)", fill=c_fill, border=c_bord, txt_col=c_txt, cex=0.75)
-    draw_node(nx, ny, x_lab(), fill="#eeedfe", border="#534ab7", txt_col="#2c2c2a")
-    draw_node(yx, yy, y_lab(), fill="#eeedfe", border="#534ab7", txt_col="#2c2c2a")
+    draw_node(cx, cy, "C (collider)", fill=c_fill, border=c_bord, txt_col=c_txt, cex=1.0)
+    draw_node(nx, ny, x_lab(), fill="#eeedfe", border="#534ab7", txt_col="#2c2c2a", cex=1.1)
+    draw_node(yx, yy, y_lab(), fill="#eeedfe", border="#534ab7", txt_col="#2c2c2a", cex=1.1)
 
     # Footer note
     note <- if (show) "Dashed ring = conditioned by selection  \u2014  r shown in selected subset"
             else      "Full population  \u2014  toggle selection to condition on C"
-    text(0.50, 0.96, note, cex=0.62, col="#888780", adj=c(0.5,0.5))
+    text(0.50, 0.96, note, cex=0.85, col="#888780", adj=c(0.5,0.5))
 
   }, bg="white")
 }
