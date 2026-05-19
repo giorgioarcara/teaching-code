@@ -260,10 +260,16 @@ server <- function(input, output, session) {
     med <- median(x)
     s   <- sd(x)
 
+    # compute y_max from histogram counts to place labels just above tallest bar
+    breaks  <- seq(x_range[1], x_range[2] + bw, by = bw)
+    counts  <- hist(x, breaks = breaks, plot = FALSE)$counts
+    y_top   <- max(counts) * 1.05   # 5% above tallest bar
+    y_label <- max(counts) * 0.97   # just inside the top for the label text
+
     df_hist <- data.frame(x = x)
 
     ggplot(df_hist, aes(x = x)) +
-      geom_histogram(binwidth = bw, fill = fill_col, colour = "white",
+      geom_histogram(breaks = breaks, fill = fill_col, colour = "white",
                      alpha = 0.75, linewidth = 0.3) +
 
       # mean
@@ -275,31 +281,32 @@ server <- function(input, output, session) {
       # mean + sd
       geom_vline(xintercept = m + s, colour = line_col, linewidth = 0.7, linetype = "dotted") +
 
-      # annotations at top of each line
-      annotate("text", x = m,     y = Inf,
+      # annotations just above the tallest bar, inside the panel
+      annotate("text", x = m,     y = y_label,
                label = paste0("mean\n", round(m, 2)),
-               vjust = -0.15, hjust = -0.1, size = 5.0,
+               vjust = 1, hjust = -0.1, size = 4.5,
                colour = line_col, fontface = "bold", lineheight = 1.2) +
-      annotate("text", x = med,   y = Inf,
+      annotate("text", x = med,   y = y_label,
                label = paste0("median\n", round(med, 2)),
-               vjust = -0.15, hjust =  1.1, size = 5.0,
+               vjust = 1, hjust =  1.1, size = 4.5,
                colour = line_col, lineheight = 1.2) +
-      annotate("text", x = m - s, y = Inf,
+      annotate("text", x = m - s, y = y_label,
                label = paste0("\u2212SD\n", round(m - s, 2)),
-               vjust = -0.15, hjust =  1.1, size = 4.5,
+               vjust = 1, hjust =  1.1, size = 4.0,
                colour = line_col, lineheight = 1.2) +
-      annotate("text", x = m + s, y = Inf,
+      annotate("text", x = m + s, y = y_label,
                label = paste0("+SD\n", round(m + s, 2)),
-               vjust = -0.15, hjust = -0.1, size = 4.5,
+               vjust = 1, hjust = -0.1, size = 4.0,
                colour = line_col, lineheight = 1.2) +
 
-      # SD value inside plot at bottom
-      annotate("text", x = m, y = -Inf,
+      # SD value at the bottom of the mean line
+      annotate("text", x = m, y = y_top * 0.05,
                label = paste0("SD = ", round(s, 2)),
-               vjust = -0.4, hjust = 0.5, size = 4.5,
+               vjust = 0, hjust = 0.5, size = 4.0,
                colour = line_col) +
 
       scale_x_continuous(limits = x_range, expand = expansion(mult = 0.02)) +
+      scale_y_continuous(limits = c(0, y_top)) +
       labs(
         title = group_label,
         x     = "Value",
@@ -311,8 +318,7 @@ server <- function(input, output, session) {
         axis.title        = element_text(size = 15),
         axis.text         = element_text(size = 14),
         plot.margin       = margin(t = 45, r = 10, b = 25, l = 10),
-        panel.grid.minor  = element_blank(),
-        plot.clip         = "off"
+        panel.grid.minor  = element_blank()
       )
   }
 
