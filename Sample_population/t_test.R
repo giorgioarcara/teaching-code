@@ -85,15 +85,13 @@ server <- function(input, output, session) {
   active_t    <- reactiveVal(NULL)
   last_sample <- reactiveVal(NULL)   # list(g1 = numeric, g2 = numeric)
 
-  # ── Welch-Satterthwaite df and critical value ─────────────────────────────────
-  welch_df <- reactive({
-    req(input$s1 > 0, input$s2 > 0, input$n1 >= 2, input$n2 >= 2)
-    v1 <- input$s1^2 / input$n1
-    v2 <- input$s2^2 / input$n2
-    (v1 + v2)^2 / (v1^2 / (input$n1 - 1) + v2^2 / (input$n2 - 1))
+  # ── pooled df and critical value (equal-variance t-test) ─────────────────────
+  pooled_df <- reactive({
+    req(input$n1 >= 2, input$n2 >= 2)
+    input$n1 + input$n2 - 2
   })
 
-  crit_val <- reactive({ qt(0.975, df = welch_df()) })
+  crit_val <- reactive({ qt(0.975, df = pooled_df()) })
 
   # ── simulation helper ─────────────────────────────────────────────────────────
   run_n <- function(n) {
@@ -104,7 +102,7 @@ server <- function(input, output, session) {
       g2  <- rnorm(input$n2, mean = input$m2, sd = input$s2)
       last_g1 <<- g1
       last_g2 <<- g2
-      res <- t.test(g1, g2, var.equal = FALSE)
+      res <- t.test(g1, g2, var.equal = TRUE)
       data.frame(t = as.numeric(res$statistic), p = res$p.value)
     })
     sim_data(rbind(sim_data(), do.call(rbind, results)))
@@ -158,11 +156,11 @@ server <- function(input, output, session) {
   # ── caption ───────────────────────────────────────────────────────────────────
   output$caption_text <- renderText({
     cv <- crit_val()
-    df <- welch_df()
+    df <- pooled_df()
     paste0(
       "Each dot = one simulated sample. ",
       "Critical value: \u00b1", round(cv, 3),
-      " (Welch df = ", round(df, 1), ", \u03b1 = .05, two-tailed). ",
+      " (pooled df = ", round(df, 1), ", \u03b1 = .05, two-tailed). ",
       "Dots and shading beyond the dashed lines are significant."
     )
   })
@@ -257,18 +255,10 @@ server <- function(input, output, session) {
 
   # ── Tab 2: last-sample histograms ────────────────────────────────────────────
   # Helper: build one group histogram with mean / median / sd lines
-  make_group_hist <- function(x, group_label, fill_col, line_col) {
+  make_group_hist <- function(x, group_label, fill_col, line_col, x_range, bw) {
     m   <- mean(x)
     med <- median(x)
     s   <- sd(x)
-
-    # shared x range centred on data for a tidy look
-    xlo <- min(x) - 0.5 * s
-    xhi <- max(x) + 0.5 * s
-
-    # label positions (above bars, nudged to avoid overlap)
-    bw <- diff(range(x)) / 20          # rough bin width
-    y_top <- length(x) / 5             # rough label height
 
     df_hist <- data.frame(x = x)
 
@@ -277,49 +267,52 @@ server <- function(input, output, session) {
                      alpha = 0.75, linewidth = 0.3) +
 
       # mean
-      geom_vline(xintercept = m,   colour = line_col, linewidth = 1.0, linetype = "solid") +
+      geom_vline(xintercept = m,     colour = line_col, linewidth = 1.2, linetype = "solid") +
       # median
-      geom_vline(xintercept = med, colour = line_col, linewidth = 0.7, linetype = "dashed") +
+      geom_vline(xintercept = med,   colour = line_col, linewidth = 0.9, linetype = "dashed") +
       # mean - sd
-      geom_vline(xintercept = m - s, colour = line_col, linewidth = 0.5, linetype = "dotted") +
+      geom_vline(xintercept = m - s, colour = line_col, linewidth = 0.7, linetype = "dotted") +
       # mean + sd
-      geom_vline(xintercept = m + s, colour = line_col, linewidth = 0.5, linetype = "dotted") +
+      geom_vline(xintercept = m + s, colour = line_col, linewidth = 0.7, linetype = "dotted") +
 
       # annotations at top of each line
       annotate("text", x = m,     y = Inf,
                label = paste0("mean\n", round(m, 2)),
-               vjust = -0.15, hjust = -0.1, size = 3.1,
-               colour = line_col, fontface = "bold", lineheight = 1.1) +
+               vjust = -0.15, hjust = -0.1, size = 5.0,
+               colour = line_col, fontface = "bold", lineheight = 1.2) +
       annotate("text", x = med,   y = Inf,
                label = paste0("median\n", round(med, 2)),
-               vjust = -0.15, hjust =  1.1, size = 3.1,
-               colour = line_col, lineheight = 1.1) +
+               vjust = -0.15, hjust =  1.1, size = 5.0,
+               colour = line_col, lineheight = 1.2) +
       annotate("text", x = m - s, y = Inf,
                label = paste0("\u2212SD\n", round(m - s, 2)),
-               vjust = -0.15, hjust =  1.1, size = 2.8,
-               colour = line_col, lineheight = 1.1) +
+               vjust = -0.15, hjust =  1.1, size = 4.5,
+               colour = line_col, lineheight = 1.2) +
       annotate("text", x = m + s, y = Inf,
                label = paste0("+SD\n", round(m + s, 2)),
-               vjust = -0.15, hjust = -0.1, size = 2.8,
-               colour = line_col, lineheight = 1.1) +
+               vjust = -0.15, hjust = -0.1, size = 4.5,
+               colour = line_col, lineheight = 1.2) +
 
-      # SD bracket label inside plot
+      # SD value inside plot at bottom
       annotate("text", x = m, y = -Inf,
                label = paste0("SD = ", round(s, 2)),
-               vjust = -0.4, hjust = 0.5, size = 3.0,
+               vjust = -0.4, hjust = 0.5, size = 4.5,
                colour = line_col) +
 
-      coord_cartesian(clip = "off") +
+      scale_x_continuous(limits = x_range, expand = expansion(mult = 0.02)) +
       labs(
         title = group_label,
         x     = "Value",
         y     = "Count"
       ) +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = 16) +
       theme(
-        plot.title       = element_text(face = "bold", colour = line_col, size = 13),
-        plot.margin      = margin(t = 30, r = 10, b = 20, l = 10),
-        panel.grid.minor = element_blank()
+        plot.title        = element_text(face = "bold", colour = line_col, size = 18),
+        axis.title        = element_text(size = 15),
+        axis.text         = element_text(size = 14),
+        plot.margin       = margin(t = 45, r = 10, b = 25, l = 10),
+        panel.grid.minor  = element_blank(),
+        plot.clip         = "off"
       )
   }
 
@@ -332,11 +325,14 @@ server <- function(input, output, session) {
                  colour = "grey50", size = 5) +
         theme_void()
     } else {
-      p1 <- make_group_hist(ls$g1, "Group 1", "#93C4EE", "#185FA5")
-      p2 <- make_group_hist(ls$g2, "Group 2", "#F0A98A", "#993C1D")
+      all_vals <- c(ls$g1, ls$g2)
+      padding  <- 0.05 * diff(range(all_vals))
+      x_range  <- c(min(all_vals) - padding, max(all_vals) + padding)
+      bw       <- diff(x_range) / 20   # shared binwidth from shared range
 
-      # stack vertically using base graphics layout via cowplot-free approach:
-      # use gridExtra if available, otherwise patchwork, otherwise grid.arrange
+      p1 <- make_group_hist(ls$g1, "Group 1", "#93C4EE", "#185FA5", x_range, bw)
+      p2 <- make_group_hist(ls$g2, "Group 2", "#F0A98A", "#993C1D", x_range, bw)
+
       if (requireNamespace("patchwork", quietly = TRUE)) {
         library(patchwork)
         p1 / p2
@@ -344,7 +340,6 @@ server <- function(input, output, session) {
         library(gridExtra)
         gridExtra::grid.arrange(p1, p2, ncol = 1)
       } else {
-        # fallback: side by side using grid
         gridExtra::grid.arrange(p1, p2, ncol = 2)
       }
     }
