@@ -21,7 +21,7 @@ ui <- fluidPage(
 
       hr(),
 
-      actionButton("simulate", "\u25b6  Simulate one sample",
+      actionButton("simulate", "\u25b6  Run one simulation",
                    width = "100%", style = "font-weight:500;"),
       br(), br(),
       fluidRow(
@@ -69,7 +69,7 @@ ui <- fluidPage(
 
         # ── Tab 2: last sample histograms ──────────────────────────────────────
         tabPanel(
-          "Last sample",
+          "Last sampling",
           br(),
           p("Histograms of the two groups drawn in the most recent simulation.",
             style = "color: #666; font-size: 13px; margin-bottom: 12px;"),
