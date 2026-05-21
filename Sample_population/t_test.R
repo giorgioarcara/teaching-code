@@ -62,7 +62,9 @@ ui <- fluidPage(
           plotOutput("dot_plot", height = "460px"),
           br(),
           p(textOutput("caption_text", inline = TRUE),
-            style = "color: #666; font-size: 13px;")
+            style = "color: #666; font-size: 13px;"),
+          br(),
+          uiOutput("formula_display")
         ),
 
         # ── Tab 2: last sample histograms ──────────────────────────────────────
@@ -164,6 +166,98 @@ server <- function(input, output, session) {
       "Dots and shading beyond the dashed lines are significant."
     )
   })
+
+  # ── Tab 1: formula panel ─────────────────────────────────────────────────────
+  output$formula_display <- renderUI({
+    ls <- last_sample()
+
+    frac <- function(num, den)
+      paste0(
+        "<span style='display:inline-block; text-align:center; vertical-align:middle;'>",
+        "<span style='display:block; border-bottom:1.5px solid #555; padding:0 4px;'>", num, "</span>",
+        "<span style='display:block; padding:0 4px;'>", den, "</span>",
+        "</span>"
+      )
+    r <- function(x, d = 3) formatC(round(x, d), format = "f", digits = d)
+
+    box_style <- paste0(
+      "background:#f7f7f7; border:1px solid #ddd; border-radius:6px;",
+      "padding:14px 20px; font-size:14px; line-height:2.8;",
+      "font-family: 'Courier New', monospace;"
+    )
+    label_style <- "font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#888; font-family:sans-serif; margin-bottom:4px;"
+
+    # ── generic formula (always shown) ──────────────────────────────────────────
+    sp_generic <- paste0(
+      "s<sub>p</sub> = &radic;",
+      frac(
+        "(n<sub>1</sub>&minus;1)s<sub>1</sub><sup>2</sup> + (n<sub>2</sub>&minus;1)s<sub>2</sub><sup>2</sup>",
+        "n<sub>1</sub> + n<sub>2</sub> &minus; 2"
+      )
+    )
+    t_generic <- paste0(
+      "t = ",
+      frac(
+        "x&#772;<sub>1</sub> &minus; x&#772;<sub>2</sub>",
+        "s<sub>p</sub> &middot; &radic;(1/n<sub>1</sub> + 1/n<sub>2</sub>)"
+      )
+    )
+
+    left_col <- column(6,
+      div(style = label_style, "General formula"),
+      div(style = box_style,
+        HTML(sp_generic), HTML("<br>"), HTML(t_generic)
+      )
+    )
+
+    # ── numeric version: uses actual last sample values ──────────────────────────
+    right_col <- if (is.null(ls)) {
+      column(6,
+        div(style = label_style, "With last sample values"),
+        div(style = paste0(box_style, "color:#aaa;"),
+          HTML("Run a simulation to see the numeric formula.")
+        )
+      )
+    } else {
+      g1 <- ls$g1; g2 <- ls$g2
+      n1 <- length(g1); n2 <- length(g2)
+      xbar1 <- mean(g1); xbar2 <- mean(g2)
+      s1    <- sd(g1);   s2    <- sd(g2)
+      df    <- n1 + n2 - 2
+      sp    <- sqrt(((n1 - 1) * s1^2 + (n2 - 1) * s2^2) / df)
+      se    <- sp * sqrt(1/n1 + 1/n2)
+      t_val <- (xbar1 - xbar2) / se
+
+      sp_num <- paste0(
+        "s<sub>p</sub> = &radic;",
+        frac(
+          paste0("(", n1-1, ")&times;", r(s1^2), " + (", n2-1, ")&times;", r(s2^2)),
+          paste0(n1, " + ", n2, " &minus; 2 = ", df)
+        ),
+        " = ", r(sp)
+      )
+      t_num <- paste0(
+        "t = ",
+        frac(
+          paste0(r(xbar1), " &minus; ", r(xbar2)),
+          paste0(r(sp), " &middot; &radic;(1/", n1, " + 1/", n2, ")")
+        ),
+        " = ",
+        frac(r(xbar1 - xbar2), r(se)),
+        " = <b>", r(t_val), "</b>"
+      )
+
+      column(6,
+        div(style = label_style, "With last sample values"),
+        div(style = box_style,
+          HTML(sp_num), HTML("<br>"), HTML(t_num)
+        )
+      )
+    }
+
+    tagList(fluidRow(left_col, right_col))
+  })
+
 
   # ── Tab 1: dot / histogram plot ───────────────────────────────────────────────
   output$dot_plot <- renderPlot({
