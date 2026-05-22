@@ -1,6 +1,39 @@
 library(shiny)
 library(ggplot2)
 
+# ── shared pedagogical note (rendered as HTML in both tabs) ───────────────────
+ped_note <- div(
+  style = paste0(
+    "background:#fffbe6; border-left:4px solid #c9a800;",
+    "border-radius:6px; padding:14px 18px; font-size:13px; line-height:1.8;",
+    "margin-top:8px;"
+  ),
+  tags$b("\u2139\ufe0f How to use this simulator"),
+  tags$ul(
+    style = "margin:6px 0 0 0; padding-left:18px;",
+    tags$li(
+      tags$b("Simulate under H\u2080 (null hypothesis):"),
+      " set the same mean for both groups (e.g. \u03bc\u2081 = \u03bc\u2082 = 50).",
+      " The t-scores accumulate around zero and only ~5% exceed the critical",
+      " value by chance — that is exactly what \u03b1 = .05 means."
+    ),
+    tags$li(
+      tags$b("Simulate under H\u2081 (alternative hypothesis):"),
+      " set different means (e.g. \u03bc\u2081 = 50, \u03bc\u2082 = 55).",
+      " The distribution shifts; more t-scores cross the critical value —",
+      " that proportion is the empirical statistical power."
+    ),
+    tags$li(
+      tags$b("Assumption — equal variances:"),
+      " the standard (pooled) t-test assumes \u03c3\u2081 \u2248 \u03c3\u2082.",
+      " When this holds, the simulated t-scores follow the t-distribution",
+      " with df = n\u2081 + n\u2082 \u2212 2. If you set very different SDs,",
+      " the empirical % of p < .05 under H\u2080 will drift away from 5%,",
+      " showing why Welch\u2019s correction exists."
+    )
+  )
+)
+
 ui <- fluidPage(
   titlePanel("p-value via Simulation — Independent Samples t-test"),
   sidebarLayout(
@@ -64,7 +97,9 @@ ui <- fluidPage(
           p(textOutput("caption_text", inline = TRUE),
             style = "color: #666; font-size: 13px;"),
           br(),
-          uiOutput("formula_display")
+          uiOutput("formula_display"),
+          br(),
+          ped_note
         ),
 
         # ── Tab 2: last sample histograms ──────────────────────────────────────
@@ -73,7 +108,11 @@ ui <- fluidPage(
           br(),
           p("Histograms of the two groups drawn in the most recent simulation.",
             style = "color: #666; font-size: 13px; margin-bottom: 12px;"),
-          plotOutput("sample_plot", height = "460px")
+          plotOutput("sample_plot", height = "460px"),
+          br(),
+          uiOutput("formula_display2"),
+          br(),
+          ped_note
         )
       )
     )
@@ -85,9 +124,9 @@ server <- function(input, output, session) {
   # ── reactive stores ───────────────────────────────────────────────────────────
   sim_data    <- reactiveVal(data.frame(t = numeric(0), p = numeric(0)))
   active_t    <- reactiveVal(NULL)
-  last_sample <- reactiveVal(NULL)   # list(g1 = numeric, g2 = numeric)
+  last_sample <- reactiveVal(NULL)
 
-  # ── pooled df and critical value (equal-variance t-test) ─────────────────────
+  # ── pooled df and critical value ──────────────────────────────────────────────
   pooled_df <- reactive({
     req(input$n1 >= 2, input$n2 >= 2)
     input$n1 + input$n2 - 2
@@ -167,9 +206,8 @@ server <- function(input, output, session) {
     )
   })
 
-  # ── Tab 1: formula panel ─────────────────────────────────────────────────────
-  output$formula_display <- renderUI({
-    ls <- last_sample()
+  # ── formula builder (shared logic) ───────────────────────────────────────────
+  build_formula_ui <- function(ls) {
 
     frac <- function(num, den)
       paste0(
@@ -185,9 +223,12 @@ server <- function(input, output, session) {
       "padding:14px 20px; font-size:14px; line-height:2.8;",
       "font-family: 'Courier New', monospace;"
     )
-    label_style <- "font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#888; font-family:sans-serif; margin-bottom:4px;"
+    label_style <- paste0(
+      "font-size:11px; text-transform:uppercase; letter-spacing:.06em;",
+      "color:#888; font-family:sans-serif; margin-bottom:4px;"
+    )
 
-    # ── generic formula (always shown) ──────────────────────────────────────────
+    # generic formula
     sp_generic <- paste0(
       "s<sub>p</sub> = &radic;",
       frac(
@@ -210,7 +251,6 @@ server <- function(input, output, session) {
       )
     )
 
-    # ── numeric version: uses actual last sample values ──────────────────────────
     right_col <- if (is.null(ls)) {
       column(6,
         div(style = label_style, "With last sample values"),
@@ -256,8 +296,10 @@ server <- function(input, output, session) {
     }
 
     tagList(fluidRow(left_col, right_col))
-  })
+  }
 
+  output$formula_display  <- renderUI({ build_formula_ui(last_sample()) })
+  output$formula_display2 <- renderUI({ build_formula_ui(last_sample()) })
 
   # ── Tab 1: dot / histogram plot ───────────────────────────────────────────────
   output$dot_plot <- renderPlot({
@@ -348,34 +390,25 @@ server <- function(input, output, session) {
   })
 
   # ── Tab 2: last-sample histograms ────────────────────────────────────────────
-  # Helper: build one group histogram with mean / median / sd lines
   make_group_hist <- function(x, group_label, fill_col, line_col, x_range, bw) {
     m   <- mean(x)
     med <- median(x)
     s   <- sd(x)
 
-    # compute y_max from histogram counts to place labels just above tallest bar
     breaks  <- seq(x_range[1], x_range[2] + bw, by = bw)
     counts  <- hist(x, breaks = breaks, plot = FALSE)$counts
-    y_top   <- max(counts) * 1.05   # 5% above tallest bar
-    y_label <- max(counts) * 0.97   # just inside the top for the label text
+    y_top   <- max(counts) * 1.05
+    y_label <- max(counts) * 0.97
 
     df_hist <- data.frame(x = x)
 
     ggplot(df_hist, aes(x = x)) +
       geom_histogram(breaks = breaks, fill = fill_col, colour = "white",
                      alpha = 0.75, linewidth = 0.3) +
-
-      # mean
       geom_vline(xintercept = m,     colour = line_col, linewidth = 1.2, linetype = "solid") +
-      # median
       geom_vline(xintercept = med,   colour = line_col, linewidth = 0.9, linetype = "dashed") +
-      # mean - sd
       geom_vline(xintercept = m - s, colour = line_col, linewidth = 0.7, linetype = "dotted") +
-      # mean + sd
       geom_vline(xintercept = m + s, colour = line_col, linewidth = 0.7, linetype = "dotted") +
-
-      # annotations just above the tallest bar, inside the panel
       annotate("text", x = m,     y = y_label,
                label = paste0("mean\n", round(m, 2)),
                vjust = 1, hjust = -0.1, size = 4.5,
@@ -392,27 +425,20 @@ server <- function(input, output, session) {
                label = paste0("+SD\n", round(m + s, 2)),
                vjust = 1, hjust = -0.1, size = 4.0,
                colour = line_col, lineheight = 1.2) +
-
-      # SD value at the bottom of the mean line
       annotate("text", x = m, y = y_top * 0.05,
                label = paste0("SD = ", round(s, 2)),
                vjust = 0, hjust = 0.5, size = 4.0,
                colour = line_col) +
-
       scale_x_continuous(limits = x_range, expand = expansion(mult = 0.02)) +
       scale_y_continuous(limits = c(0, y_top)) +
-      labs(
-        title = group_label,
-        x     = "Value",
-        y     = "Count"
-      ) +
+      labs(title = group_label, x = "Value", y = "Count") +
       theme_minimal(base_size = 16) +
       theme(
-        plot.title        = element_text(face = "bold", colour = line_col, size = 18),
-        axis.title        = element_text(size = 15),
-        axis.text         = element_text(size = 14),
-        plot.margin       = margin(t = 45, r = 10, b = 25, l = 10),
-        panel.grid.minor  = element_blank()
+        plot.title       = element_text(face = "bold", colour = line_col, size = 18),
+        axis.title       = element_text(size = 15),
+        axis.text        = element_text(size = 14),
+        plot.margin      = margin(t = 45, r = 10, b = 25, l = 10),
+        panel.grid.minor = element_blank()
       )
   }
 
@@ -428,7 +454,7 @@ server <- function(input, output, session) {
       all_vals <- c(ls$g1, ls$g2)
       padding  <- 0.05 * diff(range(all_vals))
       x_range  <- c(min(all_vals) - padding, max(all_vals) + padding)
-      bw       <- diff(x_range) / 20   # shared binwidth from shared range
+      bw       <- diff(x_range) / 20
 
       p1 <- make_group_hist(ls$g1, "Group 1", "#93C4EE", "#185FA5", x_range, bw)
       p2 <- make_group_hist(ls$g2, "Group 2", "#F0A98A", "#993C1D", x_range, bw)
